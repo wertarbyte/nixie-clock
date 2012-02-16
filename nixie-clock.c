@@ -48,39 +48,7 @@ int main(void) {
 
 static void set_bcd(uint8_t i) {
 	PORTD &= ~BCDMASK;
-	switch(i) {
-		case 0:
-			break;
-		case 1:
-			PORTD |= 1<<PD0;
-			break;
-		case 2:
-			PORTD |= 1<<PD1;
-			break;
-		case 3:
-			PORTD |= (1<<PD0 | 1<<PD1);
-			break;
-		case 4:
-			PORTD |= (1<<PD2);
-			break;
-		case 5:
-			PORTD |= (1<<PD0 | 1<<PD2);
-			break;
-		case 6:
-			PORTD |= (0<<PD0 | 1<<PD1 | 1<<PD2 | 0<<PD3);
-			break;
-		case 7:
-			PORTD |= (1<<PD0 | 1<<PD1 | 1<<PD2 | 0<<PD3);
-			break;
-		case 8:
-			PORTD |= (0<<PD0 | 0<<PD1 | 0<<PD2 | 1<<PD3);
-			break;
-		case 9:
-			PORTD |= (1<<PD0 | 0<<PD1 | 0<<PD2 | 1<<PD3);
-			break;
-		default:
-			PORTD |= (1<<PD0 | 1<<PD1 | 1<<PD2 | 1<<PD3);
-	}
+	PORTD |= (i & BCDMASK);
 }
 
 static void display_tube(uint8_t n) {

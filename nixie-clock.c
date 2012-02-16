@@ -4,10 +4,23 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
+#include "USI_TWI_Master.h"
+
 #define INPUT_DELAY 250
 
 #define BCDMASK (1<<PD0 | 1<<PD1 | 1<<PD2 | 1<<PD3)
 #define MULTIMASK (1<<PB0 | 1<<PB1 | 1<<PB2 | 1<<PB3)
+
+#define PCF8583_WRITE_ADDRESS ( 0xA0 & ~(0x01) )
+#define PCF8583_READ_ADDRESS  ( PCF8583_WRITE_ADDRESS | 0x01 )
+/* used to fetch clock data from I2C
+ * PCF8583 memory layout:
+ * [ 1/10 seconds | 1/100 seconds ] 0x1
+ * [   10 seconds |     1 seconds ] 0x2
+ * [   10 minutes |     1 minutes ] 0x3
+ * [   10 hours   |     1 hours   ] 0x4
+ */
+static uint8_t buffer_i2c[6] = {0};
 
 static struct {
 	uint8_t h;
@@ -18,6 +31,25 @@ static struct {
 	37,
 	0
 };
+
+static void get_clock(void) {
+	buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
+	buffer_i2c[1] = 0x02; // start of time data
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 2);
+	buffer_i2c[0] = PCF8583_READ_ADDRESS;
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 4);
+	clock.s = (buffer_i2c[1] & 0x0F) + (buffer_i2c[1] >> 4)*10;
+	clock.m = ((buffer_i2c[2] & 0x0F) + (buffer_i2c[2] >> 4)*10);
+	clock.h = ((buffer_i2c[3] & 0x0F) + (buffer_i2c[3] >> 4)*10);
+}
+
+static void set_clock(void) {
+        buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
+	buffer_i2c[1] = 0x03; // start of time data (minutes)
+	buffer_i2c[2] = ( ((clock.m/10)<<4) | (clock.m%10) );
+	buffer_i2c[3] = ( ((clock.h/10)<<4) | (clock.h%10) );
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 4);
+}
 
 int main(void) {
 	/* initialize BCD pins */
@@ -32,17 +64,23 @@ int main(void) {
 	OCR0A = 0xFA;
 
 	TIMSK = (1<<OCIE0A);
+
+	USI_TWI_Master_Initialise();
+
 	sei();
 
 	while (1) {
 		if (~PINA & 1<<PA0) {
 			clock.h = (clock.h + 1)%24;
+			set_clock();
 			_delay_ms(INPUT_DELAY);
 		}
 		if (~PINA & 1<<PA1) {
 			clock.m = (clock.m + 1)%60;
+			set_clock();
 			_delay_ms(INPUT_DELAY);
 		}
+		get_clock();
 	}
 }
 

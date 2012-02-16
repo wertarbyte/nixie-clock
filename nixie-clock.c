@@ -52,10 +52,11 @@ static void set_clock(void) {
 }
 
 int main(void) {
-	/* initialize BCD pins */
-	DDRD = BCDMASK;
+	/* initialize BCD pins and decimal dot */
+	DDRD = ( BCDMASK | 1<<PD5 );
 	/* initialize multiplexing pins */
 	DDRB = MULTIMASK;
+
 	/* initialize input pins */
 	PORTA = (1<<PA0 | 1<<PA1); // pullups
 
@@ -92,6 +93,7 @@ static void set_bcd(uint8_t i) {
 static void display_tube(uint8_t n) {
 	PORTB |= MULTIMASK;
 	uint8_t val = 10;
+	PORTD &= ~(1<<PD5);
 	switch (n) {
 		case 3:
 			val = (clock.h / 10);
@@ -100,6 +102,9 @@ static void display_tube(uint8_t n) {
 			val = clock.h % 10;
 			break;
 		case 1:
+			if (clock.s%2) {
+				PORTD |= (1<<PD5);
+			}
 			val = clock.m / 10;
 			break;
 		case 0:

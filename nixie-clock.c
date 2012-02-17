@@ -45,10 +45,12 @@ static void get_clock(void) {
 
 static void set_clock(void) {
         buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
-	buffer_i2c[1] = 0x03; // start of time data (minutes)
-	buffer_i2c[2] = ( ((clock.m/10)<<4) | (clock.m%10) );
-	buffer_i2c[3] = ( ((clock.h/10)<<4) | (clock.h%10) );
-	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 4);
+	buffer_i2c[1] = 0x01; // start of time data
+	buffer_i2c[2] = 0; /* set 1/100 seconds to 0 */
+	buffer_i2c[3] = ( ((clock.s/10)<<4) | (clock.s%10) );
+	buffer_i2c[4] = ( ((clock.m/10)<<4) | (clock.m%10) );
+	buffer_i2c[5] = ( ((clock.h/10)<<4) | (clock.h%10) );
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 6);
 }
 
 int main(void) {
@@ -78,6 +80,7 @@ int main(void) {
 		}
 		if (~PINA & 1<<PA1) {
 			clock.m = (clock.m + 1)%60;
+			clock.s = 0;
 			set_clock();
 			_delay_ms(INPUT_DELAY);
 		}

@@ -85,6 +85,7 @@ int main(void) {
 	sei();
 
 	while (1) {
+		get_clock();
 		if (~PINA & 1<<PA0) {
 			mode = ((M_MAX+mode-1) % M_MAX);
 			_delay_ms(INPUT_DELAY);
@@ -98,20 +99,20 @@ int main(void) {
 				case M_SETHOUR:
 					clock.h = (clock.h+rotary_input)%24;
 					if (clock.h < 0) clock.h += 24;
+					set_clock();
 					break;
 				case M_SETMINUTE:
 					clock.m = (clock.m+rotary_input)%60;
 					if (clock.m < 0) clock.m += 60;
 					clock.s = 0; /* reset seconds */
+					set_clock();
 					break;
 				default:
 					/* nothing to do */
 					break;
 			}
 			rotary_input = 0;
-			set_clock();
 		}
-		get_clock();
 	}
 }
 

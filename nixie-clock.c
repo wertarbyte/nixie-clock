@@ -23,14 +23,23 @@
 static uint8_t buffer_i2c[6] = {0};
 
 static struct {
-	uint8_t h;
-	uint8_t m;
-	uint8_t s;
+	int8_t h;
+	int8_t m;
+	int8_t s;
 } clock = {
 	13,
 	37,
 	0
 };
+
+static volatile int8_t rotary_input = 0;
+
+static enum t_mode {
+	M_CLOCK = 0,
+	M_SETHOUR,
+	M_SETMINUTE,
+	M_MAX
+} mode;
 
 static void get_clock(void) {
 	buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
@@ -62,6 +71,9 @@ int main(void) {
 	/* initialize input pins */
 	PORTA = (1<<PA0 | 1<<PA1); // pullups
 
+	/* rotary encoder */
+	PORTD |= (1<<PD6 | 1<<PD4); // pullups
+
 	TCCR0A = (1<<WGM01);
 	TCCR0B = (1<<CS01);
 	OCR0A = 0xFA;
@@ -74,15 +86,30 @@ int main(void) {
 
 	while (1) {
 		if (~PINA & 1<<PA0) {
-			clock.h = (clock.h + 1)%24;
-			set_clock();
+			mode = ((M_MAX+mode-1) % M_MAX);
 			_delay_ms(INPUT_DELAY);
 		}
 		if (~PINA & 1<<PA1) {
-			clock.m = (clock.m + 1)%60;
-			clock.s = 0;
-			set_clock();
+			mode = ((M_MAX+mode+1) % M_MAX);
 			_delay_ms(INPUT_DELAY);
+		}
+		if (rotary_input) {
+			switch (mode) {
+				case M_SETHOUR:
+					clock.h = (clock.h+rotary_input)%24;
+					if (clock.h < 0) clock.h += 24;
+					break;
+				case M_SETMINUTE:
+					clock.m = (clock.m+rotary_input)%60;
+					if (clock.m < 0) clock.m += 60;
+					clock.s = 0; /* reset seconds */
+					break;
+				default:
+					/* nothing to do */
+					break;
+			}
+			rotary_input = 0;
+			set_clock();
 		}
 		get_clock();
 	}
@@ -99,22 +126,49 @@ static void display_tube(uint8_t n) {
 	PORTD &= ~(1<<PD5);
 	switch (n) {
 		case 3:
-			val = (clock.h / 10);
+			if (mode == M_CLOCK || mode == M_SETHOUR) {
+				val = (clock.h / 10);
+			}
 			break;
 		case 2:
-			val = clock.h % 10;
+			if (mode == M_CLOCK || mode == M_SETHOUR) {
+				val = clock.h % 10;
+			}
 			break;
 		case 1:
 			if (clock.s%2) {
 				PORTD |= (1<<PD5);
 			}
-			val = clock.m / 10;
+			if (mode == M_CLOCK || mode == M_SETMINUTE) {
+				val = clock.m / 10;
+			}
 			break;
 		case 0:
-			val = clock.m % 10;
+			if (mode == M_CLOCK || mode == M_SETMINUTE) {
+				val = clock.m % 10;
+			}
+			break;
+		default:
+			val = 10; /* disabled */
 	}
 	set_bcd( val );
 	PORTB &= ~(1<<n);
+}
+
+static int8_t get_rotary_steps(uint8_t a, uint8_t oldA, uint8_t b, uint8_t oldB) {
+	if (oldA && !a && !b && !oldB) return 1;
+	if (!oldA && a && !b && !oldB) return -1;
+	return 0;
+}
+
+static void check_rotary(void) {
+	static uint8_t oldA = 0;
+	static uint8_t oldB = 0;
+	uint8_t a = !!(~PIND & 1<<PD4);
+	uint8_t b = !!(~PIND & 1<<PD6);
+	rotary_input += get_rotary_steps(a, oldA, b, oldB);
+	oldA = a;
+	oldB = b;
 }
 
 ISR(TIMER0_COMPA_vect) {
@@ -122,4 +176,5 @@ ISR(TIMER0_COMPA_vect) {
 	display_tube(active_tube);
 	active_tube++;
 	active_tube %= 4;
+	check_rotary();
 }

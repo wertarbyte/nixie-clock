@@ -3,6 +3,7 @@
 #include <avr/pgmspace.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
+#include <string.h>
 
 #include "USI_TWI_Master.h"
 
@@ -19,14 +20,20 @@
  * [   10 seconds |     1 seconds ] 0x2
  * [   10 minutes |     1 minutes ] 0x3
  * [   10 hours   |     1 hours   ] 0x4
+ * [          day/year            ] 0x5
+ * [            month             ] 0x6
  */
-static uint8_t buffer_i2c[6] = {0};
+static uint8_t buffer_i2c[9] = {0};
 
 static struct {
+	int8_t month;
+	int8_t day;
 	int8_t h;
 	int8_t m;
 	int8_t s;
 } clock = {
+	1,
+	1,
 	13,
 	37,
 	0
@@ -36,30 +43,42 @@ static volatile int8_t rotary_input = 0;
 
 static enum t_mode {
 	M_CLOCK = 0,
+	M_DATE,
 	M_SETHOUR,
 	M_SETMINUTE,
+	M_SETDAY,
+	M_SETMONTH,
 	M_MAX
 } mode;
 
 static void get_clock(void) {
+	memset(buffer_i2c, 0, sizeof(buffer_i2c));
 	buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
 	buffer_i2c[1] = 0x02; // start of time data
 	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 2);
 	buffer_i2c[0] = PCF8583_READ_ADDRESS;
-	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 4);
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 6);
 	clock.s = (buffer_i2c[1] & 0x0F) + (buffer_i2c[1] >> 4)*10;
 	clock.m = ((buffer_i2c[2] & 0x0F) + (buffer_i2c[2] >> 4)*10);
 	clock.h = ((buffer_i2c[3] & 0x0F) + (buffer_i2c[3] >> 4)*10);
+
+	/* we ignore the year for now */
+	clock.day = ((buffer_i2c[4] & 0x0F) + ((buffer_i2c[4] & 0x3F) >> 4)*10);
+	clock.month = ((buffer_i2c[5] & 0x0F) + ((buffer_i2c[5] & 0x1F) >> 4)*10);
 }
 
 static void set_clock(void) {
+	memset(buffer_i2c, 0, sizeof(buffer_i2c));
         buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
 	buffer_i2c[1] = 0x01; // start of time data
 	buffer_i2c[2] = 0; /* set 1/100 seconds to 0 */
 	buffer_i2c[3] = ( ((clock.s/10)<<4) | (clock.s%10) );
 	buffer_i2c[4] = ( ((clock.m/10)<<4) | (clock.m%10) );
 	buffer_i2c[5] = ( ((clock.h/10)<<4) | (clock.h%10) );
-	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 6);
+	/* we ignore the year for now */
+	buffer_i2c[6] = ( ((clock.day/10)<<4) | (clock.day%10) );
+	buffer_i2c[7] = ( ((clock.month/10)<<4) | (clock.month%10) );
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 8);
 }
 
 int main(void) {
@@ -107,6 +126,16 @@ int main(void) {
 					clock.s = 0; /* reset seconds */
 					set_clock();
 					break;
+				case M_SETMONTH:
+					clock.month = ((clock.month-1+rotary_input)%12)+1;
+					if (clock.month <= 0) clock.month += 12;
+					set_clock();
+					break;
+				case M_SETDAY:
+					clock.day = ((clock.day-1+rotary_input)%31)+1;
+					if (clock.day <= 0) clock.day += 31;
+					set_clock();
+					break;
 				default:
 					/* nothing to do */
 					break;
@@ -129,24 +158,32 @@ static void display_tube(uint8_t n) {
 		case 3:
 			if (mode == M_CLOCK || mode == M_SETHOUR) {
 				val = (clock.h / 10);
+			} else if (mode == M_DATE || mode == M_SETDAY) {
+				val = (clock.day / 10);
 			}
 			break;
 		case 2:
 			if (mode == M_CLOCK || mode == M_SETHOUR) {
 				val = clock.h % 10;
+			} else if (mode == M_DATE || mode == M_SETDAY) {
+				val = (clock.day % 10);
 			}
 			break;
 		case 1:
-			if (clock.s%2) {
+			if (mode == M_DATE || mode == M_SETDAY || mode == M_SETMONTH || clock.s%2) {
 				PORTD |= (1<<PD5);
 			}
 			if (mode == M_CLOCK || mode == M_SETMINUTE) {
 				val = clock.m / 10;
+			} else if (mode == M_DATE || mode == M_SETMONTH) {
+				val = clock.month / 10;
 			}
 			break;
 		case 0:
 			if (mode == M_CLOCK || mode == M_SETMINUTE) {
 				val = clock.m % 10;
+			} else if (mode == M_DATE || mode == M_SETMONTH) {
+				val = clock.month % 10;
 			}
 			break;
 		default:

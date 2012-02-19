@@ -180,23 +180,24 @@ static void set_bcd(uint8_t i) {
 static void display_tube(uint8_t n) {
 	PORTB |= MULTIMASK;
 	uint8_t val = 10;
+	uint8_t blink = (clock.s%2 == 0);
 	PORTD &= ~(1<<PD5);
 	switch (n) {
 		case 3:
-			if (mode == M_CLOCK || mode == M_SETHOUR) {
+			if (mode == M_CLOCK || mode == M_SETMINUTE || (mode == M_SETHOUR && blink)) {
 				val = (clock.h / 10);
-			} else if (mode == M_DATE || mode == M_SETDAY) {
+			} else if (mode == M_DATE || mode == M_SETMONTH || (mode == M_SETDAY && blink)) {
 				val = (clock.day / 10);
-			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
 				val = (clock.year / 1000)%10;
 			}
 			break;
 		case 2:
-			if (mode == M_CLOCK || mode == M_SETHOUR) {
+			if (mode == M_CLOCK || mode == M_SETMINUTE || (mode == M_SETHOUR && blink)) {
 				val = clock.h % 10;
-			} else if (mode == M_DATE || mode == M_SETDAY) {
+			} else if (mode == M_DATE || mode == M_SETMONTH || (mode == M_SETDAY && blink)) {
 				val = (clock.day % 10);
-			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
 				val = (clock.year / 100)%10;
 			}
 			break;
@@ -207,20 +208,20 @@ static void display_tube(uint8_t n) {
 			) {
 				PORTD |= (1<<PD5);
 			}
-			if (mode == M_CLOCK || mode == M_SETMINUTE) {
+			if (mode == M_CLOCK || mode == M_SETHOUR || (mode == M_SETMINUTE && blink)) {
 				val = clock.m / 10;
-			} else if (mode == M_DATE || mode == M_SETMONTH) {
+			} else if (mode == M_DATE || mode == M_SETDAY || (mode == M_SETMONTH && blink)) {
 				val = clock.month / 10;
-			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
 				val = (clock.year / 10)%10;
 			}
 			break;
 		case 0:
-			if (mode == M_CLOCK || mode == M_SETMINUTE) {
+			if (mode == M_CLOCK || mode == M_SETHOUR || (mode == M_SETMINUTE && blink)) {
 				val = clock.m % 10;
-			} else if (mode == M_DATE || mode == M_SETMONTH) {
+			} else if (mode == M_DATE || mode == M_SETDAY || (mode == M_SETMONTH && blink)) {
 				val = clock.month % 10;
-			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
 				val = clock.year % 10;
 			}
 			break;

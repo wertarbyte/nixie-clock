@@ -5,7 +5,7 @@
 #include <util/delay.h>
 #include <string.h>
 
-#include "USI_TWI_Master.h"
+#include "USI_TWI_Master.c"
 
 #define INPUT_DELAY 250
 

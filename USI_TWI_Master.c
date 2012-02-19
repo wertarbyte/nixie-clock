@@ -36,7 +36,9 @@
 #include <util/delay.h>
 #include "USI_TWI_Master.h"
 
+static
 unsigned char USI_TWI_Master_Transfer( unsigned char );
+static
 unsigned char USI_TWI_Master_Stop( void );
 
 union  USI_TWI_state
@@ -53,6 +55,7 @@ union  USI_TWI_state
 /*---------------------------------------------------------------
  USI TWI single master initialization function
 ---------------------------------------------------------------*/
+static
 void USI_TWI_Master_Initialise( void )
 {
   PORT_USI |= (1<<PIN_USI_SDA);           // Enable pullup on SDA, to set high as released state.
@@ -73,6 +76,7 @@ void USI_TWI_Master_Initialise( void )
 /*---------------------------------------------------------------
 Use this function to get hold of the error message from the last transmission
 ---------------------------------------------------------------*/
+static
 unsigned char USI_TWI_Get_State_Info( void )
 {
   return ( USI_TWI_state.errorState );                            // Return error state.
@@ -89,6 +93,7 @@ unsigned char USI_TWI_Get_State_Info( void )
  Success or error code is returned. Error codes are defined in 
  USI_TWI_Master.h
 ---------------------------------------------------------------*/
+static
 unsigned char USI_TWI_Start_Transceiver_With_Data( unsigned char *msg, unsigned char msgSize)
 {
   unsigned char tempUSISR_8bit = (1<<USISIF)|(1<<USIOIF)|(1<<USIPF)|(1<<USIDC)|      // Prepare register value to: Clear flags, and
@@ -212,6 +217,7 @@ unsigned char USI_TWI_Start_Transceiver_With_Data( unsigned char *msg, unsigned 
  Data to be sent has to be placed into the USIDR prior to calling
  this function. Data read, will be return'ed from the function.
 ---------------------------------------------------------------*/
+static
 unsigned char USI_TWI_Master_Transfer( unsigned char temp )
 {
   USISR = temp;                                     // Set USISR according to temp.
@@ -241,6 +247,7 @@ unsigned char USI_TWI_Master_Transfer( unsigned char temp )
  Function for generating a TWI Stop Condition. Used to release 
  the TWI bus.
 ---------------------------------------------------------------*/
+static
 unsigned char USI_TWI_Master_Stop( void )
 {
   PORT_USI &= ~(1<<PIN_USI_SDA);           // Pull SDA low.

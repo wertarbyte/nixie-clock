@@ -201,7 +201,10 @@ static void display_tube(uint8_t n) {
 			}
 			break;
 		case 1:
-			if (mode == M_DATE || mode == M_SETDAY || mode == M_SETMONTH || (mode == M_CLOCK && clock.s%2)) {
+			if (
+				((mode == M_CLOCK || mode == M_SETHOUR || mode == M_SETMINUTE) && clock.s%2) ||
+				mode == M_DATE || mode == M_SETDAY || mode == M_SETMONTH
+			) {
 				PORTD |= (1<<PD5);
 			}
 			if (mode == M_CLOCK || mode == M_SETMINUTE) {

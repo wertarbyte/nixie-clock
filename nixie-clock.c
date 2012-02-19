@@ -48,7 +48,8 @@ static struct {
 static volatile int8_t rotary_input = 0;
 
 static enum t_mode {
-	M_CLOCK = 0,
+	M_SECONDS,
+	M_CLOCK,
 	M_DATE,
 	M_YEAR,
 	M_SETHOUR,
@@ -57,7 +58,7 @@ static enum t_mode {
 	M_SETMONTH,
 	M_SETYEAR,
 	M_MAX
-} mode;
+} mode = M_CLOCK;
 
 static void get_clock(void) {
 	buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
@@ -115,7 +116,7 @@ int main(void) {
 	PORTA = (1<<PA0 | 1<<PA1); // pullups
 
 	/* rotary encoder */
-	PORTD |= (1<<PD6 | 1<<PD4); // pullups
+	PORTD = (1<<PD6 | 1<<PD4); // pullups
 
 	TCCR0A = (1<<WGM01);
 	TCCR0B = (1<<CS01);
@@ -187,6 +188,8 @@ static void display_tube(uint8_t n) {
 		case 3:
 			if (mode == M_CLOCK || mode == M_SETMINUTE || (mode == M_SETHOUR && blink)) {
 				val = (clock.h / 10);
+			} else if (mode == M_SECONDS) {
+				val = (clock.s / 10);
 			} else if (mode == M_DATE || mode == M_SETMONTH || (mode == M_SETDAY && blink)) {
 				val = (clock.day / 10);
 			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
@@ -196,6 +199,8 @@ static void display_tube(uint8_t n) {
 		case 2:
 			if (mode == M_CLOCK || mode == M_SETMINUTE || (mode == M_SETHOUR && blink)) {
 				val = clock.h % 10;
+			} else if (mode == M_SECONDS) {
+				val = (clock.s % 10);
 			} else if (mode == M_DATE || mode == M_SETMONTH || (mode == M_SETDAY && blink)) {
 				val = (clock.day % 10);
 			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
@@ -211,6 +216,8 @@ static void display_tube(uint8_t n) {
 			}
 			if (mode == M_CLOCK || mode == M_SETHOUR || (mode == M_SETMINUTE && blink)) {
 				val = clock.m / 10;
+			} else if (mode == M_SECONDS) {
+				val = (clock.cs / 10);
 			} else if (mode == M_DATE || mode == M_SETDAY || (mode == M_SETMONTH && blink)) {
 				val = clock.month / 10;
 			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
@@ -220,6 +227,8 @@ static void display_tube(uint8_t n) {
 		case 0:
 			if (mode == M_CLOCK || mode == M_SETHOUR || (mode == M_SETMINUTE && blink)) {
 				val = clock.m % 10;
+			} else if (mode == M_SECONDS) {
+				val = (clock.cs % 10);
 			} else if (mode == M_DATE || mode == M_SETDAY || (mode == M_SETMONTH && blink)) {
 				val = clock.month % 10;
 			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {

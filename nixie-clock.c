@@ -34,12 +34,14 @@ static struct {
 	int8_t h;
 	int8_t m;
 	int8_t s;
+	int8_t cs;
 } clock = {
 	2012,
 	1,
 	1,
 	13,
 	37,
+	0,
 	0
 };
 
@@ -58,19 +60,19 @@ static enum t_mode {
 } mode;
 
 static void get_clock(void) {
-	memset(buffer_i2c, 0, sizeof(buffer_i2c));
 	buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
-	buffer_i2c[1] = 0x02; // start of time data
+	buffer_i2c[1] = 0x01; // start of time data
 	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 2);
 	buffer_i2c[0] = PCF8583_READ_ADDRESS;
-	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 6);
-	clock.s = (buffer_i2c[1] & 0x0F) + (buffer_i2c[1] >> 4)*10;
-	clock.m = ((buffer_i2c[2] & 0x0F) + (buffer_i2c[2] >> 4)*10);
-	clock.h = ((buffer_i2c[3] & 0x0F) + (buffer_i2c[3] >> 4)*10);
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 7);
+	clock.cs = (buffer_i2c[1] & 0x0F) + (buffer_i2c[1] >> 4)*10;
+	clock.s = (buffer_i2c[2] & 0x0F) + (buffer_i2c[2] >> 4)*10;
+	clock.m = ((buffer_i2c[3] & 0x0F) + (buffer_i2c[3] >> 4)*10);
+	clock.h = ((buffer_i2c[4] & 0x0F) + (buffer_i2c[4] >> 4)*10);
 
-	uint8_t year = (buffer_i2c[4]>>6); // only four years, we save a base value somewhere else
-	clock.day = ((buffer_i2c[4] & 0x0F) + ((buffer_i2c[4] & 0x3F) >> 4)*10);
-	clock.month = ((buffer_i2c[5] & 0x0F) + ((buffer_i2c[5] & 0x1F) >> 4)*10);
+	uint8_t year = (buffer_i2c[5]>>6); // only four years, we save a base value somewhere else
+	clock.day = ((buffer_i2c[5] & 0x0F) + ((buffer_i2c[5] & 0x3F) >> 4)*10);
+	clock.month = ((buffer_i2c[6] & 0x0F) + ((buffer_i2c[6] & 0x1F) >> 4)*10);
 
 	int16_t year_base = YEAR_ZERO;
 	/* get the base year */
@@ -85,8 +87,7 @@ static void get_clock(void) {
 }
 
 static void set_clock(void) {
-	memset(buffer_i2c, 0, sizeof(buffer_i2c));
-        buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
+	buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
 	buffer_i2c[1] = 0x01; // start of time data
 	buffer_i2c[2] = 0; /* set 1/100 seconds to 0 */
 	buffer_i2c[3] = ( ((clock.s/10)<<4) | (clock.s%10) );
@@ -180,7 +181,7 @@ static void set_bcd(uint8_t i) {
 static void display_tube(uint8_t n) {
 	PORTB |= MULTIMASK;
 	uint8_t val = 10;
-	uint8_t blink = (clock.s%2 == 0);
+	uint8_t blink = (clock.cs < 50);
 	PORTD &= ~(1<<PD5);
 	switch (n) {
 		case 3:
@@ -189,7 +190,7 @@ static void display_tube(uint8_t n) {
 			} else if (mode == M_DATE || mode == M_SETMONTH || (mode == M_SETDAY && blink)) {
 				val = (clock.day / 10);
 			} else if (mode == M_YEAR || (mode == M_SETYEAR && blink)) {
-				val = (clock.year / 1000)%10;
+				val = (clock.year / 1000);
 			}
 			break;
 		case 2:

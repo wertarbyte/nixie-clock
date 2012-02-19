@@ -25,13 +25,17 @@
  */
 static uint8_t buffer_i2c[9] = {0};
 
+#define YEAR_ZERO 2000
+
 static struct {
+	int16_t year;
 	int8_t month;
 	int8_t day;
 	int8_t h;
 	int8_t m;
 	int8_t s;
 } clock = {
+	2012,
 	1,
 	1,
 	13,
@@ -44,10 +48,12 @@ static volatile int8_t rotary_input = 0;
 static enum t_mode {
 	M_CLOCK = 0,
 	M_DATE,
+	M_YEAR,
 	M_SETHOUR,
 	M_SETMINUTE,
 	M_SETDAY,
 	M_SETMONTH,
+	M_SETYEAR,
 	M_MAX
 } mode;
 
@@ -62,9 +68,20 @@ static void get_clock(void) {
 	clock.m = ((buffer_i2c[2] & 0x0F) + (buffer_i2c[2] >> 4)*10);
 	clock.h = ((buffer_i2c[3] & 0x0F) + (buffer_i2c[3] >> 4)*10);
 
-	/* we ignore the year for now */
+	uint8_t year = (buffer_i2c[4]>>6); // only four years, we save a base value somewhere else
 	clock.day = ((buffer_i2c[4] & 0x0F) + ((buffer_i2c[4] & 0x3F) >> 4)*10);
 	clock.month = ((buffer_i2c[5] & 0x0F) + ((buffer_i2c[5] & 0x1F) >> 4)*10);
+
+	int16_t year_base = YEAR_ZERO;
+	/* get the base year */
+	buffer_i2c[0] = PCF8583_WRITE_ADDRESS;
+	buffer_i2c[1] = 0x10; // where the custom data goes
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 2);
+	buffer_i2c[0] = PCF8583_READ_ADDRESS;
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 3);
+	year_base += (int8_t)buffer_i2c[1];
+
+	clock.year = year + year_base;
 }
 
 static void set_clock(void) {
@@ -75,10 +92,16 @@ static void set_clock(void) {
 	buffer_i2c[3] = ( ((clock.s/10)<<4) | (clock.s%10) );
 	buffer_i2c[4] = ( ((clock.m/10)<<4) | (clock.m%10) );
 	buffer_i2c[5] = ( ((clock.h/10)<<4) | (clock.h%10) );
-	/* we ignore the year for now */
-	buffer_i2c[6] = ( ((clock.day/10)<<4) | (clock.day%10) );
+
+	buffer_i2c[6] = ( ((clock.day/10)<<4) | (clock.day%10) ) | ((clock.year%4)<<6);
 	buffer_i2c[7] = ( ((clock.month/10)<<4) | (clock.month%10) );
 	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 8);
+
+	/* save the base year */
+	int8_t year_base = clock.year - (clock.year%4) - YEAR_ZERO;
+	buffer_i2c[1] = 0x10;
+	buffer_i2c[2] = year_base;
+	USI_TWI_Start_Transceiver_With_Data(buffer_i2c, 4);
 }
 
 int main(void) {
@@ -136,6 +159,10 @@ int main(void) {
 					if (clock.day <= 0) clock.day += 31;
 					set_clock();
 					break;
+				case M_SETYEAR:
+					clock.year = clock.year+rotary_input;
+					set_clock();
+					break;
 				default:
 					/* nothing to do */
 					break;
@@ -160,6 +187,8 @@ static void display_tube(uint8_t n) {
 				val = (clock.h / 10);
 			} else if (mode == M_DATE || mode == M_SETDAY) {
 				val = (clock.day / 10);
+			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+				val = (clock.year / 1000)%10;
 			}
 			break;
 		case 2:
@@ -167,16 +196,20 @@ static void display_tube(uint8_t n) {
 				val = clock.h % 10;
 			} else if (mode == M_DATE || mode == M_SETDAY) {
 				val = (clock.day % 10);
+			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+				val = (clock.year / 100)%10;
 			}
 			break;
 		case 1:
-			if (mode == M_DATE || mode == M_SETDAY || mode == M_SETMONTH || clock.s%2) {
+			if (mode == M_DATE || mode == M_SETDAY || mode == M_SETMONTH || (mode == M_CLOCK && clock.s%2)) {
 				PORTD |= (1<<PD5);
 			}
 			if (mode == M_CLOCK || mode == M_SETMINUTE) {
 				val = clock.m / 10;
 			} else if (mode == M_DATE || mode == M_SETMONTH) {
 				val = clock.month / 10;
+			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+				val = (clock.year / 10)%10;
 			}
 			break;
 		case 0:
@@ -184,6 +217,8 @@ static void display_tube(uint8_t n) {
 				val = clock.m % 10;
 			} else if (mode == M_DATE || mode == M_SETMONTH) {
 				val = clock.month % 10;
+			} else if (mode == M_YEAR || mode == M_SETYEAR) {
+				val = clock.year % 10;
 			}
 			break;
 		default:

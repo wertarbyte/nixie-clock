@@ -182,7 +182,7 @@ static void set_bcd(uint8_t i) {
 static void display_tube(uint8_t n) {
 	PORTB |= MULTIMASK;
 	uint8_t val = 10;
-	uint8_t blink = (clock.cs < 50);
+	uint8_t blink = (clock.cs < 50) || rotary_input;
 	PORTD &= ~(1<<PD5);
 	switch (n) {
 		case 3:
